@@ -29,6 +29,7 @@ module.exports.updateUserInfo = (req, res) => {
     { new: true, runValidators: true },
   )
     .orFail()
+    .then((user) => res.send({ data: user }))
     .catch((err) => handleErrors(err, res));
 };
 

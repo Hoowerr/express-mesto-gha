@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { WEB_PATTERN } = require('../utils/constants');
 
 const cardSchema = new mongoose.Schema({
   name: {
@@ -10,16 +11,22 @@ const cardSchema = new mongoose.Schema({
   link: {
     type: String,
     required: true,
+    validate: {
+      validator(value) {
+        return WEB_PATTERN.test(value);
+      },
+    },
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
     required: true,
   },
-  likes: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
     default: [],
-  },
+  }],
   createdAt: {
     type: Date,
     default: Date.now,

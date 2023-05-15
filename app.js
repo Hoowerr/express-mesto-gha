@@ -1,33 +1,31 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const { NOT_FOUND_ERROR } = require('./errors/errors');
+const cookieParser = require('cookie-parser');
+const validationErrors = require('celebrate').errors;
+
+const router = require('./routes/index');
+const errors = require('./middlewares/errors');
 
 const { PORT = 3000 } = process.env;
 
 const app = express();
 
 mongoose
-  .connect('mongodb://127.0.0.1:27017/mestodb', {
-    useNewUrlParser: true,
+  .connect('mongodb://127.0.0.1:27017/mestodb')
+  .then(() => {
+    console.log('БД подключена');
+  })
+  .catch(() => {
+    console.log('Не удалось подключиться к БД');
   });
-
-app.use((req, res, next) => {
-  req.user = {
-    _id: '6452fd028d7622cd4fa73ff4',
-  };
-  next();
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.use('/users', require('./routes/users'));
-app.use('/cards', require('./routes/cards'));
-
-app.use('*', (req, res) => {
-  res.status(NOT_FOUND_ERROR).send({ message: 'Page not found' });
-});
-
+app.use(cookieParser());
+app.use(router);
+app.use(validationErrors());
+app.use(errors);
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
 });

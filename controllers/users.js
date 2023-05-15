@@ -1,46 +1,85 @@
-const User = require('../models/user');
-const { handleErrors } = require('../errors/errors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-module.exports.getAllUsers = (req, res) => {
+const { NODE_ENV, SECRET_KEY } = process.env;
+const { CREATED_CODE } = require('../utils/constants');
+const User = require('../models/user');
+
+module.exports.login = (req, res, next) => {
+  const { email, password } = req.body;
+  return User.findUserByCredentials(email, password)
+    .then((user) => {
+      const token = jwt.sign(
+        { _id: user._id },
+        NODE_ENV === 'production' ? SECRET_KEY : 'secret-key',
+        { expiresIn: '7d' },
+      );
+      res.cookie('jwt', token, {
+        httpOnly: true,
+        maxAge: 3600000 * 24 * 7,
+      });
+      res.send({ message: 'You have successfully logged in!' });
+    })
+    .catch(next);
+};
+
+module.exports.getAllUsers = (req, res, next) => {
   User.find({})
     .then((users) => res.send(users))
-    .catch((err) => handleErrors(err, res));
+    .catch(next);
 };
 
-module.exports.getUser = (req, res) => {
-  User.findById(req.params.userId)
+const getUserById = (req, res, id, next) => {
+  User.findById(id)
     .orFail()
     .then((user) => res.send({ data: user }))
-    .catch((err) => handleErrors(err, res));
+    .catch(next);
 };
 
-module.exports.createUser = (req, res) => {
-  const { name, about, avatar } = req.body;
-  User.create({ name, about, avatar })
-    .then((user) => res.status(201).send({ data: user }))
-    .catch((err) => handleErrors(err, res));
+module.exports.getMe = (req, res, next) => {
+  const id = req.user._id;
+  getUserById(req, res, id, next);
 };
 
-module.exports.updateUserInfo = (req, res) => {
-  const { name, about } = req.body;
+module.exports.getUser = (req, res, next) => {
+  const id = req.params.userId;
+  getUserById(req, res, id, next);
+};
+
+const updateInfo = (req, res, dataToUpdate, next) => {
+  const id = req.user._id;
   User.findByIdAndUpdate(
-    req.user._id,
-    { name, about },
+    id,
+    dataToUpdate,
     { new: true, runValidators: true },
   )
     .orFail()
     .then((user) => res.send({ data: user }))
-    .catch((err) => handleErrors(err, res));
+    .catch(next);
 };
 
-module.exports.updateUserAvatar = (req, res) => {
-  const { avatar } = req.body;
-  User.findByIdAndUpdate(
-    req.user._id,
-    { avatar },
-    { new: true, runValidators: true },
-  )
-    .orFail()
-    .then((user) => res.send({ data: user }))
-    .catch((err) => handleErrors(err, res));
+module.exports.updateUserInfo = (req, res, next) => {
+  const userData = req.body;
+  updateInfo(req, res, userData, next);
+};
+
+module.exports.createUser = (req, res, next) => {
+  const {
+    name, about, avatar, email, password,
+  } = req.body;
+  bcrypt.hash(password, 10)
+    .then((hash) => User.create({
+      name, about, avatar, email, password: hash,
+    }))
+    .then((user) => {
+      const userData = user.toObject();
+      delete userData.password;
+      res.status(CREATED_CODE).send({ data: userData });
+    })
+    .catch(next);
+};
+
+module.exports.updateUserAvatar = (req, res, next) => {
+  const avatarLink = req.body;
+  updateInfo(req, res, avatarLink, next);
 };
